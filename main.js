@@ -1,6 +1,5 @@
 
 function setupHandwriteArea(canvas, x, y, width, height, callback) {
-  var context = canvas.getContext('2d');
   var prev = null;
   var stream = [];
 
@@ -21,18 +20,6 @@ function setupHandwriteArea(canvas, x, y, width, height, callback) {
     stream[current.x] = current.y;
   }
 
-  var drawStream = function() {
-    context.clearRect(x, y, width + 1, height + 1);
-    context.strokeRect(x, y, width, height);
-    context.strokeStyle = 'black';
-    context.beginPath();
-    for (var i = 1; i < stream.length; i++) {
-      context.moveTo(x + (i - 1), y + stream[i - 1]);
-      context.lineTo(x + i, y + stream[i]);
-    }
-    context.stroke();
-  }
-
   var handleMouseMove = function(e) {
     if (e.offsetX < x || x + width < e.offsetX ||
         e.offsetY < y || y + height < e.offsetY) {
@@ -42,15 +29,12 @@ function setupHandwriteArea(canvas, x, y, width, height, callback) {
     if (e.buttons) {
       var current = { x: e.offsetX - x, y: e.offsetY - y };
       updateStream(prev, current);
-      drawStream();
       prev = current;
       callback(stream);
     } else {
       prev = null;
     }
   }
-
-  drawStream();
 
   canvas.addEventListener('mousemove', handleMouseMove);
 }
@@ -102,19 +86,6 @@ function matchStream(stream1, stream2) {
   return match;
 }
 
-function updateMatch(canvas, stream1, stream2) {
-  var match = matchStream(mabi(stream1), mabi(stream2));
-  var context = canvas.getContext('2d');
-
-  context.clearRect(10, 110 + 1, 400, 100 - 1);
-  context.beginPath();
-  for (var i = 0; i < match.length; i++) {
-    context.moveTo(10 + match[i][0] * 10, 110);
-    context.lineTo(10 + match[i][1] * 10, 210);
-  }
-  context.stroke();
-}
-
 function mabi(s) {
   var r = [];
   for (var i = 0; i < s.length; i++) {
@@ -125,19 +96,54 @@ function mabi(s) {
   return r;
 }
 
+function Renderer(context) {
+  this.context = context;
+}
+
+Renderer.prototype.renderStream = function(stream, bounds) {
+  this.context.clearRect(bounds.x, bounds.y, bounds.width, bounds.height);
+  this.context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+  this.context.strokeStyle = 'black';
+  this.context.beginPath();
+  for (var i = 1; i < stream.length; i++) {
+    this.context.moveTo(bounds.x + (i - 1), bounds.y + stream[i - 1]);
+    this.context.lineTo(bounds.x + i, bounds.y + stream[i]);
+  }
+  this.context.stroke();
+}
+
+Renderer.prototype.renderWarpingPath = function(warpingPath, bounds) {
+  this.context.clearRect(bounds.x, bounds.y, bounds.width, bounds.height);
+  this.context.beginPath();
+  for (var i = 0; i < warpingPath.length; i++) {
+    this.context.moveTo(bounds.x + warpingPath[i][0] * 10, bounds.y);
+    this.context.lineTo(bounds.x + warpingPath[i][1] * 10, bounds.y + bounds.height);
+  }
+  this.context.stroke();
+}
+
+function update(renderer, stream1, stream2) {
+  renderer.renderStream(stream1, { x: 10, y: 10, width: 400, height: 100 });
+  renderer.renderStream(stream2, { x: 10, y: 210, width: 400, height: 100 });
+  var w = matchStream(mabi(stream1), mabi(stream2));
+  renderer.renderWarpingPath(w, { x: 10, y: 110, width: 400, height: 100 });
+}
+
 function init() {
   var canvas = document.getElementsByClassName('dtw-handwrite-input')[0];
   var stream1 = [0];
   var stream2 = [0];
+  var context = canvas.getContext('2d');
+  var renderer = new Renderer(context);
 
   setupHandwriteArea(canvas, 10, 10, 400, 100, function(s) {
     stream1 = s;
-    updateMatch(canvas, stream1, stream2);
+    update(renderer, stream1, stream2);
   });
 
   setupHandwriteArea(canvas, 10, 210, 400, 100, function(s) {
     stream2 = s
-    updateMatch(canvas, stream1, stream2);
+    update(renderer, stream1, stream2);
   });
 }
 
