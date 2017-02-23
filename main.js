@@ -1,42 +1,41 @@
 
-function setupHandwriteArea(canvas, x, y, width, height, callback) {
-  var prev = null;
-  var stream = [];
+function HandwriteInput(bounds) {
+  this.stream = [];
+  this.bounds = bounds;
+  this.prev = null;
 
-  for (var i = 0; i < width; i++) {
-    stream.push(height / 2);
+  // initialize stream
+  for (var i = 0; i < bounds.width; i++) {
+    this.stream.push(50);
+  }
+}
+
+HandwriteInput.prototype.handleMouseMove = function(x, y, buttons) {
+  if (x < this.bounds.x || this.bounds.x + this.bounds.width < x ||
+      y < this.bounds.y || this.bounds.y + this.bounds.height < y) {
+    return;
   }
 
-  var updateStream = function(prev, current) {
-    if (prev) {
-      // complement stream since cursor movement is not countinuous
-      var i = prev.x;
-      while (i != current.x) {
-        stream[i] = prev.y + (current.y - prev.y) *
-          ((i - prev.x) / (current.x - prev.x));
-        i += (current.x > prev.x ? 1 : -1);
-      }
-    }
-    stream[current.x] = current.y;
+  if (buttons) {
+    var current = { x: x - this.bounds.x, y: y - this.bounds.y };
+    this.updateStream(this.prev, current);
+    this.prev = current;
+  } else {
+    this.prev = null;
   }
+}
 
-  var handleMouseMove = function(e) {
-    if (e.offsetX < x || x + width < e.offsetX ||
-        e.offsetY < y || y + height < e.offsetY) {
-      return;
-    }
-
-    if (e.buttons) {
-      var current = { x: e.offsetX - x, y: e.offsetY - y };
-      updateStream(prev, current);
-      prev = current;
-      callback(stream);
-    } else {
-      prev = null;
+HandwriteInput.prototype.updateStream = function(prev, current) {
+  if (prev) {
+    // complement stream since cursor movement is not countinuous
+    var i = prev.x;
+    while (i != current.x) {
+      this.stream[i] = prev.y + (current.y - prev.y) *
+        ((i - prev.x) / (current.x - prev.x));
+      i += (current.x > prev.x ? 1 : -1);
     }
   }
-
-  canvas.addEventListener('mousemove', handleMouseMove);
+  this.stream[current.x] = current.y;
 }
 
 function matchStream(stream1, stream2) {
@@ -134,16 +133,15 @@ function init() {
   var stream1 = [0];
   var stream2 = [0];
   var context = canvas.getContext('2d');
+
   var renderer = new Renderer(context);
+  var input1 = new HandwriteInput({ x: 10, y: 10, width: 400, height: 100 });
+  var input2 = new HandwriteInput({ x: 10, y: 210, width: 400, height: 100 });
 
-  setupHandwriteArea(canvas, 10, 10, 400, 100, function(s) {
-    stream1 = s;
-    update(renderer, stream1, stream2);
-  });
-
-  setupHandwriteArea(canvas, 10, 210, 400, 100, function(s) {
-    stream2 = s
-    update(renderer, stream1, stream2);
+  canvas.addEventListener('mousemove', function(e) {
+    input1.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
+    input2.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
+    update(renderer, input1.stream, input2.stream);
   });
 }
 
