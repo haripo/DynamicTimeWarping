@@ -43,53 +43,6 @@ HandwriteInput.prototype.updateStream = function(prev, current) {
   this.stream[current.x] = current.y;
 }
 
-function matchStream(stream1, stream2) {
-  var map = [];
-  var cache = [];
-
-  for (var i = 0; i < stream1.length; i++) {
-    map.push([]);
-    cache.push([]);
-    for (var j = 0; j < stream2.length; j++) {
-      map[i].push(Math.abs(stream1[i] - stream2[j]) + 1);
-      cache[i].push(Math.abs(i - j) < 150 ? -1 : Number.MAX_VALUE);
-    }
-  }
-  cache[0][0] = 1;
-
-  var search = null;
-  search = function(x, y) {
-    if (cache[x][y] <= 0) {
-      cache[x][y] = map[x][y] + Math.min(
-        (x > 0 ? search(x - 1, y) : Number.MAX_VALUE),
-        (y > 0 ? search(x, y - 1) : Number.MAX_VALUE),
-        (x > 0 && y > 0 ? search(x - 1, y - 1) : Number.MAX_VALUE)
-      );
-    }
-    return cache[x][y];
-  };
-
-  search(stream1.length - 1, stream2.length - 1);
-
-  var x = 0;
-  var y = 0;
-  var match = [];
-  while (x != stream1.length - 1 || y > stream2.length - 1) {
-    if (cache[x + 1][y + 1] <= cache[x + 1][y] &&
-        cache[x + 1][y + 1] <= cache[x][y + 1]) {
-      x += 1;
-      y += 1;
-    } else if (cache[x][y + 1] <= cache[x + 1][y]) {
-      y += 1;
-    } else {
-      x += 1;
-    }
-    match.push([x, y])
-  }
-
-  return match;
-}
-
 function Renderer(canvas) {
   this.context = canvas.getContext('2d');
   this.width = canvas.width;
@@ -187,27 +140,77 @@ function getHighlightArea(focus1, focus2, warpingPath) {
   return [[0, 0], [0, 0]];
 }
 
+function matchStream(stream1, stream2) {
+  var map = [];
+  var cache = [];
+
+  for (var i = 0; i < stream1.length; i++) {
+    map.push([]);
+    cache.push([]);
+    for (var j = 0; j < stream2.length; j++) {
+      map[i].push(Math.abs(stream1[i] - stream2[j]) + 1);
+      cache[i].push(Math.abs(i - j) < 150 ? -1 : Number.MAX_VALUE);
+    }
+  }
+  cache[0][0] = 1;
+
+  var search = null;
+  search = function(x, y) {
+    if (cache[x][y] <= 0) {
+      cache[x][y] = map[x][y] + Math.min(
+        (x > 0 ? search(x - 1, y) : Number.MAX_VALUE),
+        (y > 0 ? search(x, y - 1) : Number.MAX_VALUE),
+        (x > 0 && y > 0 ? search(x - 1, y - 1) : Number.MAX_VALUE)
+      );
+    }
+    return cache[x][y];
+  };
+
+  search(stream1.length - 1, stream2.length - 1);
+
+  var x = 0;
+  var y = 0;
+  var match = [];
+  while (x != stream1.length - 1 || y > stream2.length - 1) {
+    if (cache[x + 1][y + 1] <= cache[x + 1][y] &&
+        cache[x + 1][y + 1] <= cache[x][y + 1]) {
+      x += 1;
+      y += 1;
+    } else if (cache[x][y + 1] <= cache[x + 1][y]) {
+      y += 1;
+    } else {
+      x += 1;
+    }
+    match.push([x, y])
+  }
+
+  return match;
+}
+
 function init() {
   var canvas = document.getElementsByClassName('dtw-handwrite-input')[0];
-  var stream1 = [0];
-  var stream2 = [0];
-  var w = [];
-  var highlight = [[0, 0], [0, 0]];
 
   var renderer = new Renderer(canvas);
   var input1 = new HandwriteInput({ x: 100, y: 10, width: 400, height: 100 });
   var input2 = new HandwriteInput({ x: 100, y: 210, width: 400, height: 100 });
 
-  canvas.addEventListener('mousemove', function(e) {
-    input1.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
-    input2.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
+  var stream1 = input1.stream;
+  var stream2 = input2.stream;
+  var w = matchStream(stream1, stream2);
+  var highlight = [[0, 0], [0, 0]];
 
-    if (e.buttons) {
-      stream1 = input1.stream;
-      stream2 = input2.stream;
-      w = matchStream(stream1, stream2);
+  var update = function(e) {
+    if (e) {
+      input1.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
+      input2.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
+
+      if (e.buttons) {
+        stream1 = input1.stream;
+        stream2 = input2.stream;
+        w = matchStream(stream1, stream2);
+      }
+      highlight = getHighlightArea(input1.focus, input2.focus, w);
     }
-    highlight = getHighlightArea(input1.focus, input2.focus, w);
 
     renderer.clear();
     renderer.renderStream(stream1, { x: 100, y: 10, width: 400, height: 100 }, 'stream (x)');
@@ -216,7 +219,10 @@ function init() {
     renderer.renderStreamHighlight(highlight[0], { x: 100, y: 10, width: 400, height: 100 });
     renderer.renderStreamHighlight(highlight[1], { x: 100, y: 210, width: 400, height: 100 });
     renderer.renderWarpingPathHighlight(highlight, { x: 100, y: 110, width: 400, height: 100 });
-  });
+  };
+
+  canvas.addEventListener('mousemove', update);
+  update();
 }
 
 document.addEventListener('DOMContentLoaded', init);
