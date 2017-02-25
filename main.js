@@ -1,6 +1,8 @@
 
 function HandwriteInput(bounds) {
   this.stream = [];
+  this.focus = null;
+
   this.bounds = bounds;
   this.prev = null;
 
@@ -13,8 +15,11 @@ function HandwriteInput(bounds) {
 HandwriteInput.prototype.handleMouseMove = function(x, y, buttons) {
   if (x < this.bounds.x || this.bounds.x + this.bounds.width < x ||
       y < this.bounds.y || this.bounds.y + this.bounds.height < y) {
+    this.focus = null;
     return;
   }
+
+  this.focus = x - this.bounds.x;
 
   if (buttons) {
     var current = { x: x - this.bounds.x, y: y - this.bounds.y };
@@ -114,13 +119,22 @@ Renderer.prototype.renderStream = function(stream, bounds, label) {
   }
 }
 
+Renderer.prototype.renderStreamHighlight = function(highlightArea, bounds) {
+  this.context.strokeStyle = 'green';
+  this.context.strokeRect(
+    highlightArea[0] + bounds.x, bounds.y,
+    highlightArea[1] - highlightArea[0], bounds.height);
+}
+
 Renderer.prototype.renderWarpingPath = function(warpingPath, bounds, label) {
   var margin = 3;
   this.context.strokeStyle = 'lightgray';
   this.context.beginPath();
   for (var i = 0; i < warpingPath.length; i++) {
-    this.context.moveTo(bounds.x + warpingPath[i][0] * 10, bounds.y + margin);
-    this.context.lineTo(bounds.x + warpingPath[i][1] * 10, bounds.y + bounds.height - margin);
+    if (i % 10 == 0) {
+      this.context.moveTo(bounds.x + warpingPath[i][0], bounds.y + margin);
+      this.context.lineTo(bounds.x + warpingPath[i][1], bounds.y + bounds.height - margin);
+    }
   }
   this.context.stroke();
 
@@ -133,18 +147,52 @@ Renderer.prototype.renderWarpingPath = function(warpingPath, bounds, label) {
   }
 }
 
-function update(renderer, stream1, stream2) {
-  renderer.clear();
-  renderer.renderStream(stream1, { x: 100, y: 10, width: 400, height: 100 }, 'stream (x)');
-  renderer.renderStream(stream2, { x: 100, y: 210, width: 400, height: 100 }, 'stream (y)');
-  var w = matchStream(mabi(stream1), mabi(stream2));
-  renderer.renderWarpingPath(w, { x: 100, y: 110, width: 400, height: 100 }, 'warping path (w)');
+Renderer.prototype.renderWarpingPathHighlight = function(highlight, bounds) {
+  var margin = 3;
+  this.context.strokeStyle = 'green';
+  this.context.beginPath();
+
+  this.context.moveTo(bounds.x + highlight[0][0] * 1, bounds.y + margin);
+  this.context.lineTo(bounds.x + highlight[0][1] * 1, bounds.y + margin);
+  this.context.lineTo(bounds.x + highlight[1][0] * 1, bounds.y + bounds.height - margin);
+  this.context.lineTo(bounds.x + highlight[1][1] * 1, bounds.y + bounds.height - margin);
+  this.context.lineTo(bounds.x + highlight[0][0] * 1, bounds.y + margin);
+
+  this.context.stroke();
+}
+
+function getHighlightArea(focus1, focus2, warpingPath) {
+  var highlight = [Number.MAX_VALUE, 0];
+
+  var calc = function (focus, s, t) {
+    for (var i = 0; i < warpingPath.length; i++) {
+      if (warpingPath[i][s] == focus) {
+        if (warpingPath[i][t] < highlight[0]) {
+          highlight[0] = warpingPath[i][t];
+        }
+        if (highlight[1] < warpingPath[i][t]) {
+          highlight[1] = warpingPath[i][t];
+        }
+      }
+    }
+  }
+
+  if (focus1) {
+    calc(focus1, 0, 1);
+    return [[focus1, focus1], highlight];
+  } else if (focus2) {
+    calc(focus2, 1, 0);
+    return [highlight, [focus2, focus2]];
+  }
+  return [[0, 0], [0, 0]];
 }
 
 function init() {
   var canvas = document.getElementsByClassName('dtw-handwrite-input')[0];
   var stream1 = [0];
   var stream2 = [0];
+  var w = [];
+  var highlight = [[0, 0], [0, 0]];
 
   var renderer = new Renderer(canvas);
   var input1 = new HandwriteInput({ x: 100, y: 10, width: 400, height: 100 });
@@ -153,7 +201,21 @@ function init() {
   canvas.addEventListener('mousemove', function(e) {
     input1.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
     input2.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
-    update(renderer, input1.stream, input2.stream);
+
+    if (e.buttons) {
+      stream1 = input1.stream;
+      stream2 = input2.stream;
+      w = matchStream(stream1, stream2);
+    }
+    highlight = getHighlightArea(input1.focus, input2.focus, w);
+
+    renderer.clear();
+    renderer.renderStream(stream1, { x: 100, y: 10, width: 400, height: 100 }, 'stream (x)');
+    renderer.renderStream(stream2, { x: 100, y: 210, width: 400, height: 100 }, 'stream (y)');
+    renderer.renderWarpingPath(w, { x: 100, y: 110, width: 400, height: 100 }, 'warping path (w)');
+    renderer.renderStreamHighlight(highlight[0], { x: 100, y: 10, width: 400, height: 100 });
+    renderer.renderStreamHighlight(highlight[1], { x: 100, y: 210, width: 400, height: 100 });
+    renderer.renderWarpingPathHighlight(highlight, { x: 100, y: 110, width: 400, height: 100 });
   });
 }
 
