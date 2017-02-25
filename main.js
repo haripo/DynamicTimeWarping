@@ -46,8 +46,8 @@ function matchStream(stream1, stream2) {
     map.push([]);
     cache.push([]);
     for (var j = 0; j < stream2.length; j++) {
-      map[i].push(Math.pow(stream1[i] - stream2[j], 2) + 1);
-      cache[i].push(Math.abs(i - j) < 15 ? -1 : Number.MAX_VALUE);
+      map[i].push(Math.abs(stream1[i] - stream2[j]) + 1);
+      cache[i].push(Math.abs(i - j) < 150 ? -1 : Number.MAX_VALUE);
     }
   }
   cache[0][0] = 1;
@@ -83,16 +83,6 @@ function matchStream(stream1, stream2) {
   }
 
   return match;
-}
-
-function mabi(s) {
-  var r = [];
-  for (var i = 0; i < s.length; i++) {
-    if (i % 10 == 0) {
-      r.push(s[i]);
-    }
-  }
-  return r;
 }
 
 function Renderer(canvas) {
