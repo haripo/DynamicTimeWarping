@@ -46,7 +46,7 @@ function matchStream(stream1, stream2) {
     map.push([]);
     cache.push([]);
     for (var j = 0; j < stream2.length; j++) {
-      map[i].push(Math.abs(stream1[i] - stream2[j]) + 1);
+      map[i].push(Math.pow(stream1[i] - stream2[j], 2) + 1);
       cache[i].push(Math.abs(i - j) < 15 ? -1 : Number.MAX_VALUE);
     }
   }
@@ -95,48 +95,70 @@ function mabi(s) {
   return r;
 }
 
-function Renderer(context) {
-  this.context = context;
+function Renderer(canvas) {
+  this.context = canvas.getContext('2d');
+  this.width = canvas.width;
+  this.height = canvas.height;
 }
 
-Renderer.prototype.renderStream = function(stream, bounds) {
-  this.context.clearRect(bounds.x, bounds.y, bounds.width, bounds.height);
+Renderer.prototype.clear = function() {
+  this.context.clearRect(0, 0, this.width, this.height);
+}
+
+Renderer.prototype.renderStream = function(stream, bounds, label) {
+  this.context.strokeStyle = 'gray';
   this.context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-  this.context.strokeStyle = 'black';
   this.context.beginPath();
   for (var i = 1; i < stream.length; i++) {
     this.context.moveTo(bounds.x + (i - 1), bounds.y + stream[i - 1]);
     this.context.lineTo(bounds.x + i, bounds.y + stream[i]);
   }
   this.context.stroke();
+
+  if (label) {
+    this.context.textBaseline = 'middle';
+    this.context.fillText(
+      label,
+      bounds.x - 70,
+      bounds.y + bounds.height / 2);
+  }
 }
 
-Renderer.prototype.renderWarpingPath = function(warpingPath, bounds) {
-  this.context.clearRect(bounds.x, bounds.y, bounds.width, bounds.height);
+Renderer.prototype.renderWarpingPath = function(warpingPath, bounds, label) {
+  var margin = 3;
+  this.context.strokeStyle = 'lightgray';
   this.context.beginPath();
   for (var i = 0; i < warpingPath.length; i++) {
-    this.context.moveTo(bounds.x + warpingPath[i][0] * 10, bounds.y);
-    this.context.lineTo(bounds.x + warpingPath[i][1] * 10, bounds.y + bounds.height);
+    this.context.moveTo(bounds.x + warpingPath[i][0] * 10, bounds.y + margin);
+    this.context.lineTo(bounds.x + warpingPath[i][1] * 10, bounds.y + bounds.height - margin);
   }
   this.context.stroke();
+
+  if (label) {
+    this.context.textBaseline = 'middle';
+    this.context.fillText(
+      label,
+      bounds.x - 80,
+      bounds.y + bounds.height / 2);
+  }
 }
 
 function update(renderer, stream1, stream2) {
-  renderer.renderStream(stream1, { x: 10, y: 10, width: 400, height: 100 });
-  renderer.renderStream(stream2, { x: 10, y: 210, width: 400, height: 100 });
+  renderer.clear();
+  renderer.renderStream(stream1, { x: 100, y: 10, width: 400, height: 100 }, 'stream (x)');
+  renderer.renderStream(stream2, { x: 100, y: 210, width: 400, height: 100 }, 'stream (y)');
   var w = matchStream(mabi(stream1), mabi(stream2));
-  renderer.renderWarpingPath(w, { x: 10, y: 110, width: 400, height: 100 });
+  renderer.renderWarpingPath(w, { x: 100, y: 110, width: 400, height: 100 }, 'warping path (w)');
 }
 
 function init() {
   var canvas = document.getElementsByClassName('dtw-handwrite-input')[0];
   var stream1 = [0];
   var stream2 = [0];
-  var context = canvas.getContext('2d');
 
-  var renderer = new Renderer(context);
-  var input1 = new HandwriteInput({ x: 10, y: 10, width: 400, height: 100 });
-  var input2 = new HandwriteInput({ x: 10, y: 210, width: 400, height: 100 });
+  var renderer = new Renderer(canvas);
+  var input1 = new HandwriteInput({ x: 100, y: 10, width: 400, height: 100 });
+  var input2 = new HandwriteInput({ x: 100, y: 210, width: 400, height: 100 });
 
   canvas.addEventListener('mousemove', function(e) {
     input1.handleMouseMove(e.offsetX, e.offsetY, e.buttons);
