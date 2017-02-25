@@ -188,7 +188,7 @@ function matchStream(stream1, stream2) {
 }
 
 function init() {
-  var canvas = document.getElementsByClassName('dtw-handwrite-input')[0];
+  var canvas = document.getElementsByClassName('dtw')[0];
 
   var renderer = new Renderer(canvas);
   var input1 = new HandwriteInput({ x: 100, y: 10, width: 400, height: 100 });
